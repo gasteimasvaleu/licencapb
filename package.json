@@ -1,0 +1,20 @@
+{
+  "name": "licencas-pb",
+  "version": "1.0.0",
+  "description": "Plataforma para solicitar licenças estaduais de obras na Paraíba",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.22.3",
+    "multer": "^2.4.0"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "private": true
+}
