@@ -57,6 +57,26 @@ automaticamente no checklist ("— assinado"). Os modelos ficam em
 **Os textos são modelos de referência**: revise-os com um advogado e confira
 se o órgão exige formulário próprio antes de usá-los com clientes.
 
+## Inteligência artificial (Claude)
+
+Com `ANTHROPIC_API_KEY` configurada, a plataforma usa o Claude (modelo
+`claude-opus-5-5`) para:
+
+- **Redigir os textos técnicos**: na tela de dados, o botão "Redigir com IA"
+  escreve os campos de texto ainda vazios (descrição do empreendimento,
+  memoriais, justificativas, medidas de incêndio, etc.) a partir dos dados já
+  informados. Nada já preenchido é sobrescrito; onde falta informação, a IA
+  deixa um marcador `[informar ...]` em vez de inventar. O cliente revisa.
+- **Conferir os documentos enviados**: cada PDF/JPG/PNG enviado no checklist
+  é analisado em segundo plano. O parecer ("parece correto", "pontos de
+  atenção" ou "não corresponde ao item", com a lista de problemas, como CNPJ
+  divergente ou validade vencida) aparece no pedido para o cliente e para a
+  equipe. A aprovação continua sendo da equipe.
+
+As chamadas usam saída estruturada (JSON validado) e *fallback* automático de
+modelo em caso de recusa. Sem a chave, o app funciona normalmente sem esses
+recursos (`IA_ATIVA=0` também desliga). Código em `src/ia.js`.
+
 ## Funcionalidades
 
 - **Cliente:** cadastro com CREA/CAU, abertura de pedido, checklist de
@@ -87,10 +107,13 @@ npm test
 | `DATA_DIR` | Pasta do banco e dos uploads (padrão `./dados`) |
 | `OPERADOR_EMAIL` / `OPERADOR_SENHA` / `OPERADOR_NOME` | Cria o primeiro usuário da equipe |
 | `NODE_ENV=production` | Cookies só via HTTPS |
+| `ANTHROPIC_API_KEY` | Ativa os recursos de IA |
+| `IA_MODELO` | Modelo do Claude (padrão `claude-opus-5-5`) |
 | `PLATAFORMA_NOME` / `PLATAFORMA_CNPJ` / `PLATAFORMA_ENDERECO` | Dados da empresa que aparece como procuradora nos documentos |
 
 ## Próximos passos sugeridos
 
+- Fila para o Claude Cowork protocolar nos sites dos órgãos e acompanhar o andamento.
 - Notificações por e-mail/WhatsApp a cada mudança de status.
 - Pagamento online (honorários + taxas dos órgãos, ex.: DAE).
 - Assinatura digital (gov.br / ICP-Brasil) da procuração.

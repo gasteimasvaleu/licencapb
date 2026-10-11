@@ -10,12 +10,14 @@ const auth = require('./auth');
 const views = require('./views');
 const docs = require('./documentos');
 const { gerar, modelosDoServico } = require('./modelos');
-const { CAMPOS_POR_ID } = require('./campos');
+const Anthropic = require('@anthropic-ai/sdk');
+const { RecusaIA } = require('./ia');
+const { CAMPOS, CAMPOS_POR_ID } = require('./campos');
 
 const EXTENSOES_PERMITIDAS = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.dwg', '.dxf', '.zip', '.kml', '.kmz']);
 const TAMANHO_MAXIMO = 25 * 1024 * 1024;
 
-function criarApp({ arquivoBanco, pastaUploads, cookieSeguro = false, operadorInicial } = {}) {
+function criarApp({ arquivoBanco, pastaUploads, cookieSeguro = false, operadorInicial, ia = null } = {}) {
   const db = abrirBanco(arquivoBanco);
   fs.mkdirSync(pastaUploads, { recursive: true });
 
@@ -38,7 +40,7 @@ function criarApp({ arquivoBanco, pastaUploads, cookieSeguro = false, operadorIn
   app.use(auth.carregarUsuario(db));
   app.use(auth.conferirCsrf);
 
-  const ctx = (req, extra = {}) => ({ usuario: req.usuario, csrf: auth.tokenCsrf(req), ...extra });
+  const ctx = (req, extra = {}) => ({ usuario: req.usuario, csrf: auth.tokenCsrf(req), ia: Boolean(ia), ...extra });
 
   const upload = multer({
     storage: multer.diskStorage({
@@ -97,6 +99,34 @@ function criarApp({ arquivoBanco, pastaUploads, cookieSeguro = false, operadorIn
     req.documento = d;
     next();
   }
+
+  // Campos com valor, para dar contexto à IA (inclui os dados do próprio pedido).
+  function camposPreenchidos(vals) {
+    return CAMPOS.filter((c) => String(vals[c.id] ?? '').trim());
+  }
+
+  // Conferência pela IA roda depois da resposta ao cliente; o parecer aparece
+  // no pedido quando fica pronto. tarefasIA permite aos testes aguardar.
+  const tarefasIA = new Set();
+  function conferirEmSegundoPlano(pedido, servico, documento, caminho, nomeArquivo) {
+    const vals = valores(pedido);
+    const salvar = (situacao, parecer) => db.prepare(
+      'UPDATE documentos SET ia_situacao = ?, ia_parecer = ? WHERE id = ? AND arquivo_caminho = ?')
+      .run(situacao, parecer, documento.id, caminho);
+    const tarefa = ia.conferirDocumento({
+      servico, item: documento.item, caminho: path.join(pastaUploads, caminho), nomeArquivo,
+      valores: vals, camposContexto: camposPreenchidos(vals),
+    })
+      .then((r) => (r ? salvar(r.situacao, JSON.stringify({ resumo: r.resumo, problemas: r.problemas }))
+        : salvar(null, null)))
+      .catch((erro) => {
+        console.error('IA (conferência):', erro.message);
+        salvar('erro', null);
+      })
+      .finally(() => tarefasIA.delete(tarefa));
+    tarefasIA.add(tarefa);
+  }
+  app.locals.aguardarIA = () => Promise.all([...tarefasIA]);
 
   // ---------- Páginas públicas ----------
 
@@ -217,7 +247,47 @@ function criarApp({ arquivoBanco, pastaUploads, cookieSeguro = false, operadorIn
   app.get('/pedidos/:id/dados', auth.exigirLogin, carregarPedido, (req, res) => {
     const vals = valores(req.pedido);
     const campos = docs.camposNecessarios(docs.documentosDoPedido(req.servico, vals));
-    res.send(views.dadosDocumentos(ctx(req), req.pedido, campos, vals));
+    const aviso = req.query.ia !== undefined
+      ? `A IA redigiu ${Number(req.query.ia) || 0} texto(s). Revise e ajuste antes de salvar — você é responsável pelo conteúdo.`
+      : undefined;
+    res.send(views.dadosDocumentos(ctx(req, { aviso }), req.pedido, campos, vals));
+  });
+
+  app.post('/pedidos/:id/ia/textos', auth.exigirLogin, carregarPedido, async (req, res, next) => {
+    if (!ia) return res.status(404).send(views.erro(ctx(req), 404, 'IA não configurada.'));
+    try {
+      const vals = valores(req.pedido);
+      const necessarios = docs.camposNecessarios(docs.documentosDoPedido(req.servico, vals));
+      const camposAlvo = necessarios.filter((c) => c.tipo === 'texto' && !String(vals[c.id] ?? '').trim());
+      if (!camposAlvo.length) return res.redirect(`/pedidos/${req.pedido.id}/dados`);
+      const textos = await ia.redigirTextos({
+        servico: req.servico, valores: vals, camposAlvo, camposContexto: camposPreenchidos(vals),
+      });
+      // Relê o pedido: o cliente pode ter salvo dados enquanto a IA trabalhava.
+      const atual = db.prepare('SELECT dados FROM pedidos WHERE id = ?').get(req.pedido.id);
+      const dados = docs.lerDados(atual);
+      const preenchidos = [];
+      for (const campo of camposAlvo) {
+        const texto = String(textos[campo.id] ?? '').trim();
+        if (texto && !String(dados[campo.id] ?? '').trim()) {
+          dados[campo.id] = texto.slice(0, 4000);
+          preenchidos.push(campo.rotulo);
+        }
+      }
+      db.prepare('UPDATE pedidos SET dados = ? WHERE id = ?').run(JSON.stringify(dados), req.pedido.id);
+      if (preenchidos.length) {
+        registrarEvento(req.pedido.id, req.usuario.id, 'sistema',
+          `Textos redigidos pela IA (revisar): ${preenchidos.join('; ')}.`);
+      }
+      res.redirect(`/pedidos/${req.pedido.id}/dados?ia=${preenchidos.length}`);
+    } catch (erro) {
+      if (erro instanceof RecusaIA || erro instanceof Anthropic.APIError) {
+        console.error('IA (textos):', erro.message);
+        return res.status(502).send(views.erro(ctx(req), 502,
+          'Não foi possível redigir os textos agora. Tente de novo em alguns minutos ou preencha manualmente.'));
+      }
+      next(erro);
+    }
   });
 
   app.post('/pedidos/:id/dados', auth.exigirLogin, carregarPedido, (req, res) => {
@@ -309,12 +379,15 @@ function criarApp({ arquivoBanco, pastaUploads, cookieSeguro = false, operadorIn
       const anterior = d.arquivo_caminho;
       const nomeOriginal = path.basename(req.file.originalname).slice(0, 200);
       const situacao = d.origem === 'emitido' ? 'aprovado' : 'enviado';
+      const caminho = path.relative(pastaUploads, req.file.path);
+      const conferir = ia && d.origem !== 'emitido';
       db.prepare(`UPDATE documentos SET arquivo_nome = ?, arquivo_caminho = ?, situacao = ?, nota = NULL,
-        atualizado_em = datetime('now') WHERE id = ?`)
-        .run(nomeOriginal, path.relative(pastaUploads, req.file.path), situacao, d.id);
+        ia_situacao = ?, ia_parecer = NULL, atualizado_em = datetime('now') WHERE id = ?`)
+        .run(nomeOriginal, caminho, situacao, conferir ? 'analisando' : null, d.id);
       registrarEvento(req.pedido.id, req.usuario.id, 'documento',
         d.origem === 'emitido' ? `Documento emitido disponível: ${d.item}.` : `Arquivo enviado para "${d.item}".`);
       if (anterior) fs.rm(path.join(pastaUploads, anterior), { force: true }, () => {});
+      if (conferir) conferirEmSegundoPlano(req.pedido, req.servico, d, caminho, nomeOriginal);
       res.redirect(`/pedidos/${req.pedido.id}`);
     });
 

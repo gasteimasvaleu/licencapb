@@ -90,3 +90,9 @@ summary { cursor: pointer; }
 .orgaos h3 { margin-bottom: 4px; }
 .falta { color: var(--alerta); font-weight: 600; font-size: 14px; }
 .ok { color: var(--cor); font-weight: 700; font-size: 14px; }
+.ia-form { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.ia { margin-top: 6px; padding: 6px 10px; border-radius: 8px; font-size: 13px; background: #eef1f0; }
+.ia ul { margin: 4px 0 0; padding-left: 18px; }
+.ia-ok { background: var(--cor-clara); color: var(--cor); }
+.ia-atencao { background: #fef0c7; color: var(--alerta); }
+.ia-incompativel { background: #fee4e2; color: var(--perigo); }

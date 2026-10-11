@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS documentos (
   item TEXT NOT NULL,
   origem TEXT NOT NULL DEFAULT 'checklist' CHECK (origem IN ('checklist', 'extra', 'emitido')),
   modelo TEXT,
+  ia_situacao TEXT,
+  ia_parecer TEXT,
   arquivo_nome TEXT,
   arquivo_caminho TEXT,
   situacao TEXT NOT NULL DEFAULT 'pendente'
@@ -85,8 +87,8 @@ function migrar(db) {
   if (!colunas('pedidos').includes('dados')) {
     db.exec("ALTER TABLE pedidos ADD COLUMN dados TEXT NOT NULL DEFAULT '{}'");
   }
-  if (!colunas('documentos').includes('modelo')) {
-    db.exec('ALTER TABLE documentos ADD COLUMN modelo TEXT');
+  for (const coluna of ['modelo', 'ia_situacao', 'ia_parecer']) {
+    if (!colunas('documentos').includes(coluna)) db.exec(`ALTER TABLE documentos ADD COLUMN ${coluna} TEXT`);
   }
 }
 

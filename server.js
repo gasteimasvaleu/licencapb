@@ -1,5 +1,6 @@
 const path = require('node:path');
 const { criarApp } = require('./src/app');
+const { criarIA, iaConfigurada } = require('./src/ia');
 
 const PORTA = Number(process.env.PORT) || 3000;
 const DADOS = process.env.DATA_DIR || path.join(__dirname, 'dados');
@@ -20,6 +21,8 @@ const app = criarApp({
   pastaUploads: path.join(DADOS, 'uploads'),
   cookieSeguro: process.env.NODE_ENV === 'production',
   operadorInicial,
+  ia: iaConfigurada() ? criarIA() : null,
 });
+if (!iaConfigurada()) console.warn('ANTHROPIC_API_KEY não definida: recursos de IA desativados.');
 
 app.listen(PORTA, () => console.log(`LicençaPB rodando em http://localhost:${PORTA}`));

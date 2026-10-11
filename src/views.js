@@ -206,6 +206,23 @@ function novoPedido(ctx, servicoEscolhido, valores = {}) {
 </form>`);
 }
 
+const ROTULOS_IA = {
+  analisando: 'IA conferindo o arquivo…',
+  ok: 'IA: parece correto',
+  atencao: 'IA: pontos de atenção',
+  incompativel: 'IA: arquivo não corresponde ao item',
+  erro: 'IA: não foi possível conferir',
+};
+
+function parecerIA(d) {
+  if (!d.ia_situacao || !d.arquivo_caminho) return '';
+  let parecer = null;
+  try { parecer = JSON.parse(d.ia_parecer || 'null'); } catch { /* parecer inválido: mostra só o rótulo */ }
+  return `<div class="ia ia-${esc(d.ia_situacao)}"><strong>${esc(ROTULOS_IA[d.ia_situacao] || d.ia_situacao)}</strong>
+    ${parecer?.resumo ? `<br>${esc(parecer.resumo)}` : ''}
+    ${parecer?.problemas?.length ? `<ul>${parecer.problemas.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
+}
+
 function pedido(ctx, p, documentos, eventos, gerados = []) {
   const s = SERVICOS.get(p.servico_codigo);
   const operador = ctx.usuario.papel === 'operador';
@@ -231,7 +248,7 @@ function pedido(ctx, p, documentos, eventos, gerados = []) {
     ${d.modelo ? `<br><a href="${acao(`modelos/${esc(d.modelo)}`)}" target="_blank">Abrir modelo preenchido</a>` : ''}
     ${d.nota ? `<br><small class="nota">${esc(d.nota)}</small>` : ''}</td>
   <td><span class="situacao">${esc(d.situacao)}</span></td>
-  <td>${arquivo}${envio}${revisao}</td>
+  <td>${arquivo}${parecerIA(d)}${envio}${revisao}</td>
 </tr>`;
   }).join('');
 
@@ -333,7 +350,15 @@ function dadosDocumentos(ctx, p, campos, valores) {
         : `<label>${esc(c.rotulo)}<input name="${c.id}" type="${c.tipo === 'email' ? 'email' : 'text'}" value="${esc(valor)}"></label>`;
     }).join('')}</fieldset>`;
   }).join('');
-  return layout(ctx, `Dados — pedido #${p.id}`, `
+  const textosVazios = campos.filter((c) => c.tipo === 'texto' && !String(valores[c.id] ?? '').trim()).length;
+  const blocoIA = ctx.ia && textosVazios ? `
+<form method="post" action="/pedidos/${p.id}/ia/textos" class="cartao destaque ia-form">${csrf(ctx)}
+  <div><strong>Redigir textos com IA</strong><br><small>A IA escreve os ${textosVazios} texto(s) técnico(s) ainda vazios
+  (descrições, memoriais, justificativas) com base nos dados já informados. Salve antes os dados que alterou.
+  Pode levar até 1 minuto; revise o resultado.</small></div>
+  <button class="botao">Redigir com IA</button>
+</form>` : '';
+  return layout(ctx, `Dados — pedido #${p.id}`, `${blocoIA}
 <form method="post" action="/pedidos/${p.id}/dados" class="cartao">
   <h1>Dados para os documentos</h1>
   <p>Pedido #${p.id} — ${esc(s?.orgao)} · ${esc(s?.nome)}. Estas informações preenchem automaticamente
