@@ -136,3 +136,72 @@ claude-opus-5-5.
 Quando o Lovable pedir a chave, ele abre um formulário para guardar o secret
 `ANTHROPIC_API_KEY`: cole a chave **lá**, nunca no chat. Depois use o botão
 "Testar chave" na página Configurações.
+
+## Prompt 7 — Fila do Cowork
+
+```
+Crie a página "Fila do Cowork" (rota /equipe/cowork), visível só para
+operadores. Ela será usada por um agente de IA (Claude Cowork) que opera o
+navegador como um funcionário, então precisa ser simples, sem menus escondidos,
+modais ou rolagem infinita: tudo em texto visível, com rótulos claros.
+
+1. Sites dos órgãos (configurável)
+   - Crie a tabela orgaos_config: sigla (chave), site_protocolo (URL),
+     site_consulta (URL), forma_protocolo (online | email | presencial),
+     instrucoes (texto livre). RLS: só operadores leem e editam.
+   - Na página "Configurações", uma seção "Órgãos" com uma linha por órgão do
+     catálogo para o operador preencher esses campos. Não invente URLs: deixe
+     em branco até o operador preencher.
+
+2. Lista "Prontos para protocolar"
+   Mostre os pedidos que cumprem TODAS as condições:
+   - status recebido, em_analise ou pendencia_cliente;
+   - todos os documentos de origem checklist e extra com situacao = aprovado
+     (o documento de origem emitido não conta);
+   - pelo menos um documento.
+   Ordene do mais antigo para o mais novo.
+
+   Para cada pedido, um cartão com:
+   - Nº do pedido, órgão e serviço, data de abertura.
+   - Obra, município, endereço, área.
+   - Requerente (nome e CPF/CNPJ) e o cliente responsável (nome, e-mail, telefone,
+     CREA/CAU).
+   - Órgão: site de protocolo, forma de protocolo e instruções (de
+     orgaos_config). Se o site não estiver configurado, mostrar em destaque
+     "Site do órgão não configurado".
+   - Lista de documentos aprovados: nome do item + link de download do arquivo
+     (URL assinada do storage, válida por 1 hora, gerada ao abrir a página) +
+     nome original do arquivo.
+   - Links para os modelos gerados (procuração, requerimento etc.) do pedido.
+   - Campos e botões de ação:
+     a) "Registrar protocolo": campos nº de protocolo e previsão (data).
+        Salva no pedido, muda o status para protocolado e registra evento
+        "Protocolado no órgão: <nº> (Cowork)".
+     b) "Precisa de ajuda humana": campo de texto obrigatório com o motivo
+        (ex.: login gov.br, certificado digital, captcha, pagamento de taxa).
+        Registra evento e marca o pedido com a flag aguardando_humano = true
+        (nova coluna em pedidos, padrão false). Pedidos com essa flag saem
+        desta lista e aparecem na seção 4.
+     c) "Devolver ao cliente": campo de texto obrigatório com a pendência
+        encontrada. Muda o status para pendencia_cliente e registra a mensagem
+        no histórico do pedido, visível ao cliente.
+
+3. Lista "Acompanhar no órgão"
+   Pedidos com status protocolado ou exigencia_orgao, do protocolo mais antigo
+   para o mais novo, com: nº do pedido, órgão, serviço, nº de protocolo,
+   previsão, site de consulta (orgaos_config) e data da última atualização.
+   Ações:
+   - "Sem novidade": registra evento "Consulta no órgão sem alterações" (só
+     para registrar que foi verificado).
+   - "Exigência do órgão": campo de texto obrigatório; muda o status para
+     exigencia_orgao e registra a mensagem para o cliente.
+   - "Licença emitida": upload do arquivo no documento de origem emitido
+     e muda o status para deferido.
+
+4. Lista "Aguardando humano"
+   Pedidos com aguardando_humano = true, com o motivo mais recente, e um botão
+   "Resolvido" (só para operadores humanos) que volta a flag para false.
+
+Topo da página: contadores de cada lista e a data/hora da última atualização.
+Todas as ações registram no histórico quem fez (o usuário logado).
+```
