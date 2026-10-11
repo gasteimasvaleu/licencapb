@@ -8,6 +8,9 @@ const { abrirBanco, transacao } = require('./db');
 const { SERVICOS, STATUS, STATUS_FINAIS } = require('./catalogo');
 const auth = require('./auth');
 const views = require('./views');
+const docs = require('./documentos');
+const { gerar, modelosDoServico } = require('./modelos');
+const { CAMPOS_POR_ID } = require('./campos');
 
 const EXTENSOES_PERMITIDAS = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.dwg', '.dxf', '.zip', '.kml', '.kmz']);
 const TAMANHO_MAXIMO = 25 * 1024 * 1024;
@@ -69,13 +72,22 @@ function criarApp({ arquivoBanco, pastaUploads, cookieSeguro = false, operadorIn
   // Carrega o pedido de :id e garante que o usuário pode vê-lo.
   function carregarPedido(req, res, next) {
     const p = db.prepare(`
-      SELECT p.*, u.nome AS cliente_nome, u.email AS cliente_email, u.telefone AS cliente_telefone
+      SELECT p.*, u.nome AS cliente_nome, u.email AS cliente_email, u.telefone AS cliente_telefone,
+        u.profissao AS cliente_profissao, u.registro_profissional AS cliente_registro
       FROM pedidos p JOIN usuarios u ON u.id = p.cliente_id WHERE p.id = ?`).get(Number(req.params.id));
     if (!p || (req.usuario.papel !== 'operador' && p.cliente_id !== req.usuario.id)) {
       return res.status(404).send(views.erro(ctx(req), 404, 'Pedido não encontrado.'));
     }
     req.pedido = p;
+    req.servico = SERVICOS.get(p.servico_codigo);
     next();
+  }
+
+  function valores(p) {
+    return docs.valoresDoPedido(p, {
+      nome: p.cliente_nome, email: p.cliente_email, telefone: p.cliente_telefone,
+      profissao: p.cliente_profissao, registro_profissional: p.cliente_registro,
+    });
   }
 
   function carregarDocumento(req, res, next) {
@@ -179,6 +191,8 @@ function criarApp({ arquivoBanco, pastaUploads, cookieSeguro = false, operadorIn
         req.usuario.id, servico.codigo, texto('titulo_obra'), texto('municipio'), texto('endereco'),
         texto('proprietario'), texto('proprietario_doc'), area > 0 ? area : null, texto('observacoes') || null);
       const pedidoId = Number(lastInsertRowid);
+      const inserirModelo = db.prepare('INSERT INTO documentos (pedido_id, item, modelo) VALUES (?, ?, ?)');
+      for (const m of docs.itensChecklistDeModelos(servico)) inserirModelo.run(pedidoId, m.item, m.codigo);
       const inserirDoc = db.prepare('INSERT INTO documentos (pedido_id, item) VALUES (?, ?)');
       for (const item of servico.documentos) inserirDoc.run(pedidoId, item);
       db.prepare("INSERT INTO documentos (pedido_id, item, origem) VALUES (?, ?, 'emitido')")
@@ -194,7 +208,44 @@ function criarApp({ arquivoBanco, pastaUploads, cookieSeguro = false, operadorIn
     const eventos = db.prepare(`
       SELECT e.*, u.nome AS autor_nome FROM eventos e LEFT JOIN usuarios u ON u.id = e.autor_id
       WHERE e.pedido_id = ? ORDER BY e.id DESC`).all(req.pedido.id);
-    res.send(views.pedido(ctx(req), req.pedido, documentos, eventos));
+    const gerados = docs.documentosDoPedido(req.servico, valores(req.pedido));
+    res.send(views.pedido(ctx(req), req.pedido, documentos, eventos, gerados));
+  });
+
+  // ---------- Dados e modelos de documentos ----------
+
+  app.get('/pedidos/:id/dados', auth.exigirLogin, carregarPedido, (req, res) => {
+    const vals = valores(req.pedido);
+    const campos = docs.camposNecessarios(docs.documentosDoPedido(req.servico, vals));
+    res.send(views.dadosDocumentos(ctx(req), req.pedido, campos, vals));
+  });
+
+  app.post('/pedidos/:id/dados', auth.exigirLogin, carregarPedido, (req, res) => {
+    const dados = docs.lerDados(req.pedido);
+    for (const [id, valor] of Object.entries(req.body)) {
+      const campo = CAMPOS_POR_ID.get(id);
+      if (!campo || campo.fonte === 'pedido') continue;
+      const texto = String(valor).trim().slice(0, 4000);
+      if (texto) dados[id] = texto; else delete dados[id];
+    }
+    db.prepare('UPDATE pedidos SET dados = ? WHERE id = ?').run(JSON.stringify(dados), req.pedido.id);
+    registrarEvento(req.pedido.id, req.usuario.id, 'sistema', 'Dados dos documentos atualizados.');
+    res.redirect(`/pedidos/${req.pedido.id}#modelos`);
+  });
+
+  app.get('/pedidos/:id/modelos/:codigo', auth.exigirLogin, carregarPedido, (req, res) => {
+    const codigo = req.params.codigo;
+    if (!modelosDoServico(req.servico).includes(codigo)) {
+      return res.status(404).send(views.erro(ctx(req), 404, 'Modelo não disponível para este serviço.'));
+    }
+    const gerado = gerar(codigo, valores(req.pedido), req.servico);
+    const paraWord = req.query.formato === 'doc';
+    res.set('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+    if (paraWord) {
+      res.type('application/msword');
+      res.attachment(`pedido-${req.pedido.id}-${codigo}.doc`);
+    }
+    res.send(views.documentoGerado(req.pedido, gerado, paraWord));
   });
 
   app.post('/pedidos/:id/mensagens', auth.exigirLogin, carregarPedido, (req, res) => {

@@ -8,18 +8,54 @@ emitida pelo próprio painel.
 
 ## Órgãos e serviços no catálogo
 
-| Órgão | Serviços |
-|---|---|
-| SUDEMA | LP, LI, LO, renovação de LO, autorização de supressão de vegetação |
-| CBMPB (Bombeiros) | Análise de projeto de incêndio, vistoria e certificado de aprovação |
-| AESA | Outorga de uso de água, licença de obra hídrica |
-| IPHAEP | Projeto em área de preservação / imóvel tombado |
-| DER-PB | Acesso e uso da faixa de domínio de rodovia estadual |
-| CAGEPA | Carta de viabilidade técnica, aprovação de projeto hidrossanitário |
+| Âmbito | Órgão | Serviços |
+|---|---|---|
+| Estadual | SUDEMA | LP, LI, LO, renovação de LO, autorização de supressão de vegetação |
+| Estadual | CBMPB (Bombeiros) | Análise de projeto de incêndio, vistoria e certificado de aprovação |
+| Estadual | AESA | Outorga de uso de água, licença de obra hídrica |
+| Estadual | IPHAEP | Projeto em área de preservação / imóvel tombado |
+| Estadual | DER-PB | Acesso e uso da faixa de domínio de rodovia estadual |
+| Estadual | CAGEPA | Carta de viabilidade técnica, aprovação de projeto hidrossanitário |
+| Municipal | Prefeitura | Certidão de uso do solo, alvará de construção, habite-se |
+| Federal | Receita Federal | Inscrição no CNO, regularização da obra e CND para averbação |
+| Federal | IPHAN | Intervenção em bem tombado federal ou entorno |
+| Federal | SPU | Obras em imóvel da União (terreno de marinha) |
+| Federal | DECEA | Análise de objeto projetado no espaço aéreo (OPEA) |
+| Concessionária | Energisa Paraíba | Viabilidade de carga, aprovação de projeto elétrico |
 
 O checklist de cada serviço fica em `src/catalogo.js`. Os documentos ali são
 uma referência e **precisam ser validados com cada órgão antes de entrar em
 produção**: portarias, taxas e formulários mudam.
+
+## Modelos de documentos gerados automaticamente
+
+O cliente preenche **uma tela de dados** por pedido (só com os campos que os
+modelos daquele serviço usam, já adaptada para pessoa física ou jurídica) e a
+plataforma gera os documentos prontos para assinar, em HTML para
+imprimir/salvar em PDF ou em Word:
+
+| Modelo | Usado em |
+|---|---|
+| Procuração particular | Todos os serviços com protocolo em nome do cliente |
+| Requerimento ao órgão | Todos, adaptado ao órgão e ao serviço |
+| Declaração de veracidade | Todos |
+| Termo de responsabilidade técnica | Serviços com projeto/estudo técnico |
+| Memorial descritivo do empreendimento | SUDEMA, AESA, DER-PB, CAGEPA, prefeitura, SPU, DECEA, Energisa |
+| Texto para publicação do pedido de licença | SUDEMA |
+| Relatório de cumprimento de condicionantes | SUDEMA (LI, LO, renovação) |
+| Justificativa técnica de supressão de vegetação | SUDEMA |
+| Ficha técnica de uso de recursos hídricos | AESA |
+| Carta de solicitação de viabilidade | CAGEPA, Energisa |
+| Memorial de segurança contra incêndio | CBMPB |
+| Memorial justificativo de intervenção em patrimônio | IPHAEP, IPHAN |
+
+Campos em branco aparecem destacados em amarelo no documento e são contados
+como pendências no pedido. Os modelos que precisam de assinatura entram
+automaticamente no checklist ("— assinado"). Os modelos ficam em
+`src/modelos.js` e os campos em `src/campos.js`.
+
+**Os textos são modelos de referência**: revise-os com um advogado e confira
+se o órgão exige formulário próprio antes de usá-los com clientes.
 
 ## Funcionalidades
 
@@ -51,6 +87,7 @@ npm test
 | `DATA_DIR` | Pasta do banco e dos uploads (padrão `./dados`) |
 | `OPERADOR_EMAIL` / `OPERADOR_SENHA` / `OPERADOR_NOME` | Cria o primeiro usuário da equipe |
 | `NODE_ENV=production` | Cookies só via HTTPS |
+| `PLATAFORMA_NOME` / `PLATAFORMA_CNPJ` / `PLATAFORMA_ENDERECO` | Dados da empresa que aparece como procuradora nos documentos |
 
 ## Próximos passos sugeridos
 

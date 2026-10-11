@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS pedidos (
   protocolo_orgao TEXT,
   previsao TEXT,
   responsavel_id INTEGER REFERENCES usuarios(id),
+  dados TEXT NOT NULL DEFAULT '{}',
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS documentos (
   pedido_id INTEGER NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
   item TEXT NOT NULL,
   origem TEXT NOT NULL DEFAULT 'checklist' CHECK (origem IN ('checklist', 'extra', 'emitido')),
+  modelo TEXT,
   arquivo_nome TEXT,
   arquivo_caminho TEXT,
   situacao TEXT NOT NULL DEFAULT 'pendente'
@@ -72,7 +74,20 @@ function abrirBanco(arquivo) {
   const db = new DatabaseSync(arquivo);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
   db.exec(SCHEMA);
+  migrar(db);
   return db;
+}
+
+// Colunas adicionadas depois da primeira versão; bancos antigos ganham as
+// colunas que faltam.
+function migrar(db) {
+  const colunas = (tabela) => db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name);
+  if (!colunas('pedidos').includes('dados')) {
+    db.exec("ALTER TABLE pedidos ADD COLUMN dados TEXT NOT NULL DEFAULT '{}'");
+  }
+  if (!colunas('documentos').includes('modelo')) {
+    db.exec('ALTER TABLE documentos ADD COLUMN modelo TEXT');
+  }
 }
 
 // Executa fn dentro de uma transação, desfazendo tudo se lançar exceção.

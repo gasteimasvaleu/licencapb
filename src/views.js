@@ -1,4 +1,13 @@
 const { ORGAOS, SERVICOS, STATUS, MUNICIPIOS_SUGERIDOS } = require('./catalogo');
+const { GRUPOS } = require('./campos');
+const { MODELOS, modelosDoServico } = require('./modelos');
+
+const AMBITOS = {
+  Estadual: 'Órgãos estaduais',
+  Municipal: 'Prefeituras',
+  Federal: 'Órgãos federais',
+  Concessionária: 'Concessionárias',
+};
 
 const NOME_APP = 'LicençaPB';
 
@@ -47,7 +56,7 @@ ${ctx.aviso ? `<p class="aviso">${esc(ctx.aviso)}</p>` : ''}
 ${corpo}
 </main>
 <footer>
-  ${NOME_APP} — licenças estaduais para obras na Paraíba. Os requisitos de cada órgão podem mudar;
+  ${NOME_APP} — licenças para obras na Paraíba. Os requisitos de cada órgão podem mudar;
   a equipe confere tudo antes de protocolar.
 </footer>
 </body>
@@ -55,34 +64,39 @@ ${corpo}
 }
 
 function inicio(ctx) {
-  const orgaos = ORGAOS.map((o) => `
-    <li><strong>${esc(o.sigla)}</strong> — ${esc(o.descricao)}</li>`).join('');
+  const orgaos = Object.entries(AMBITOS).map(([a, titulo]) => `
+    <div><h3>${titulo}</h3><ul>
+    ${ORGAOS.filter((o) => o.ambito === a).map((o) => `<li><strong>${esc(o.sigla)}</strong> — ${esc(o.descricao)}</li>`).join('')}
+    </ul></div>`).join('');
   return layout(ctx, 'Início', `
 <section class="hero">
-  <h1>Suas licenças estaduais, sem fila e sem papelada.</h1>
-  <p>Para construtores, arquitetos e engenheiros na Paraíba. Você envia os documentos uma vez;
-  nossa equipe confere, protocola nos órgãos estaduais, responde às exigências e avisa você a cada etapa.</p>
+  <h1>Licenças da sua obra, sem fila e sem papelada.</h1>
+  <p>Para construtores, arquitetos e engenheiros na Paraíba. Você informa os dados da obra uma vez; a
+  plataforma gera requerimentos, procurações e memoriais prontos, confere os anexos, protocola nos órgãos
+  e avisa você a cada etapa.</p>
   <p><a class="botao" href="/cadastro">Começar agora</a> <a href="/servicos">Ver serviços e documentos</a></p>
 </section>
 <section class="passos">
   <div><span>1</span><h3>Escolha o serviço</h3><p>Licença ambiental, Bombeiros, outorga de água, patrimônio, rodovias, saneamento.</p></div>
-  <div><span>2</span><h3>Envie os documentos</h3><p>O checklist mostra exatamente o que cada órgão pede.</p></div>
+  <div><span>2</span><h3>Informe os dados</h3><p>Geramos requerimento, procuração, memoriais e declarações preenchidos para você assinar.</p></div>
   <div><span>3</span><h3>Nós protocolamos</h3><p>Conferimos, protocolamos e acompanhamos o processo no órgão.</p></div>
   <div><span>4</span><h3>Acompanhe aqui</h3><p>Status, número de protocolo, exigências e a licença emitida em um só lugar.</p></div>
 </section>
 <section>
   <h2>Órgãos atendidos</h2>
-  <ul class="orgaos">${orgaos}</ul>
+  <div class="orgaos">${orgaos}</div>
 </section>`);
 }
 
 function servicos(ctx) {
   const blocos = ORGAOS.map((o) => `
 <section class="orgao">
-  <h2>${esc(o.sigla)} <small>${esc(o.nome)}</small></h2>
+  <h2>${esc(o.sigla)} <small>${esc(o.ambito)} · ${esc(o.nome)}</small></h2>
   ${o.servicos.map((s) => `
   <details>
     <summary><strong>${esc(s.nome)}</strong> — ${esc(s.descricao)}</summary>
+    ${modelosDoServico(s).length ? `<p><strong>Gerados pela plataforma:</strong> ${modelosDoServico(s).map((m) => esc(MODELOS[m].titulo)).join(' · ')}</p>` : ''}
+    <p><strong>Você envia:</strong></p>
     <ol>${s.documentos.map((d) => `<li>${esc(d)}</li>`).join('')}</ol>
     ${ctx.usuario?.papel === 'cliente' ? `<a class="botao" href="/pedidos/novo?servico=${esc(s.codigo)}">Solicitar</a>` : ''}
   </details>`).join('')}
@@ -192,7 +206,7 @@ function novoPedido(ctx, servicoEscolhido, valores = {}) {
 </form>`);
 }
 
-function pedido(ctx, p, documentos, eventos) {
+function pedido(ctx, p, documentos, eventos, gerados = []) {
   const s = SERVICOS.get(p.servico_codigo);
   const operador = ctx.usuario.papel === 'operador';
   const acao = (caminho) => `/pedidos/${p.id}/${caminho}`;
@@ -214,11 +228,30 @@ function pedido(ctx, p, documentos, eventos) {
           <button class="pequeno perigo" name="situacao" value="rejeitado">Rejeitar</button></form>` : '';
     return `<tr class="doc-${d.situacao}">
   <td>${esc(d.item)}${d.origem === 'extra' ? ' <small>(solicitado pela equipe)</small>' : ''}
+    ${d.modelo ? `<br><a href="${acao(`modelos/${esc(d.modelo)}`)}" target="_blank">Abrir modelo preenchido</a>` : ''}
     ${d.nota ? `<br><small class="nota">${esc(d.nota)}</small>` : ''}</td>
   <td><span class="situacao">${esc(d.situacao)}</span></td>
   <td>${arquivo}${envio}${revisao}</td>
 </tr>`;
   }).join('');
+
+  const pendentes = new Set(gerados.flatMap((g) => g.faltando)).size;
+  const linhasModelos = gerados.map((g) => `<tr>
+  <td><strong>${esc(g.titulo)}</strong><br><small>${esc(g.descricao)}</small></td>
+  <td>${g.assinatura ? esc(g.assinatura) : '<small>não precisa de assinatura</small>'}</td>
+  <td>${g.faltando.length ? `<span class="falta">${g.faltando.length} informação(ões) pendente(s)</span>` : '<span class="ok">Completo</span>'}</td>
+  <td><a href="${acao(`modelos/${g.codigo}`)}" target="_blank">Ver / imprimir</a> ·
+      <a href="${acao(`modelos/${g.codigo}`)}?formato=doc">Word</a></td>
+</tr>`).join('');
+  const secaoModelos = gerados.length ? `
+<section class="cartao" id="modelos">
+  <div class="cabecalho"><h2>Documentos gerados pela plataforma</h2>
+  <a class="botao" href="${acao('dados')}">${pendentes ? `Preencher dados (${pendentes} pendentes)` : 'Revisar dados'}</a></div>
+  <p><small>Preenchidos automaticamente com os dados do pedido. Campos em amarelo ainda faltam. Depois de assinar,
+  envie cada um no item correspondente do checklist.</small></p>
+  <table><thead><tr><th>Documento</th><th>Assinatura</th><th>Situação</th><th></th></tr></thead>
+  <tbody>${linhasModelos}</tbody></table>
+</section>` : '';
 
   const historico = eventos.map((e) => `
 <li class="evento evento-${e.tipo}">
@@ -270,6 +303,7 @@ function pedido(ctx, p, documentos, eventos) {
 ${emitidos.length ? `<section class="cartao destaque"><h2>Documentos emitidos</h2>
 <table><tbody>${emitidos.map((d) => `<tr><td>${esc(d.item)}</td><td>${d.arquivo_caminho
     ? `<a class="botao" href="${acao(`documentos/${d.id}/arquivo`)}">Baixar</a>` : 'aguardando emissão'}</td></tr>`).join('')}</tbody></table></section>` : ''}
+${secaoModelos}
 <section class="cartao">
   <h2>Checklist de documentos <small>${docsChecklist.filter((d) => d.situacao === 'aprovado').length}/${docsChecklist.length} aprovados</small></h2>
   <p><small>Formatos aceitos: PDF, JPG, PNG, DWG, ZIP — até 25 MB por arquivo.</small></p>
@@ -287,8 +321,75 @@ ${emitidos.length ? `<section class="cartao destaque"><h2>Documentos emitidos</h
 </section>`);
 }
 
+function dadosDocumentos(ctx, p, campos, valores) {
+  const s = SERVICOS.get(p.servico_codigo);
+  const grupos = GRUPOS.map((g) => {
+    const lista = campos.filter((c) => c.grupo === g);
+    if (!lista.length) return '';
+    return `<fieldset><legend>${esc(g)}</legend>${lista.map((c) => {
+      const valor = valores[c.id] || '';
+      return c.tipo === 'texto'
+        ? `<label>${esc(c.rotulo)}<textarea name="${c.id}" rows="4">${esc(valor)}</textarea></label>`
+        : `<label>${esc(c.rotulo)}<input name="${c.id}" type="${c.tipo === 'email' ? 'email' : 'text'}" value="${esc(valor)}"></label>`;
+    }).join('')}</fieldset>`;
+  }).join('');
+  return layout(ctx, `Dados — pedido #${p.id}`, `
+<form method="post" action="/pedidos/${p.id}/dados" class="cartao">
+  <h1>Dados para os documentos</h1>
+  <p>Pedido #${p.id} — ${esc(s?.orgao)} · ${esc(s?.nome)}. Estas informações preenchem automaticamente
+  ${modelosDoServico(s).length} documento(s). Você pode salvar e voltar depois; os campos vazios aparecem
+  destacados nos documentos.</p>
+  ${csrf(ctx)}
+  ${grupos}
+  <button class="botao">Salvar dados</button> <a href="/pedidos/${p.id}">Voltar ao pedido</a>
+</form>`);
+}
+
+const ESTILO_DOCUMENTO = `
+@page { size: A4; margin: 2.5cm 2cm; }
+body { font: 12pt/1.6 "Times New Roman", Times, serif; color: #000; max-width: 17cm; margin: 0 auto; padding: 24px; background: #fff; }
+h1 { font-size: 14pt; text-align: center; margin: 24px 0; letter-spacing: .05em; }
+h2 { font-size: 12pt; margin: 20px 0 8px; }
+p { text-align: justify; margin: 0 0 12px; }
+.direita { text-align: right; margin-top: 32px; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0 16px; font-size: 11pt; }
+th, td { border: 1px solid #000; padding: 5px 8px; text-align: left; vertical-align: top; }
+table.dados th { width: 32%; background: #f2f2f2; }
+table.grade thead th { background: #f2f2f2; }
+.assinatura { margin: 56px auto 0; width: 70%; text-align: center; font-size: 11pt; }
+.assinatura .linha { border-top: 1px solid #000; margin-bottom: 4px; }
+mark.faltando { background: #fff3a3; color: #7a4b00; font-family: system-ui, sans-serif; font-size: 10pt; }
+.edital { border: 1px solid #000; padding: 12px 16px; }
+.aviso-doc, .barra { font-family: system-ui, sans-serif; font-size: 10pt; background: #eef6f3; padding: 8px 12px; border-radius: 6px; }
+.barra { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.barra.pendente { background: #fff3a3; }
+@media print { .barra { display: none; } body { padding: 0; } }
+`;
+
+function documentoGerado(p, gerado, paraWord) {
+  const barra = paraWord ? '' : `
+<div class="barra ${gerado.faltando.length ? 'pendente' : ''}">
+  <span>${gerado.faltando.length
+    ? `${gerado.faltando.length} informação(ões) pendente(s), destacadas em amarelo. <a href="/pedidos/${p.id}/dados">Preencher dados</a>`
+    : 'Documento completo. Revise, imprima ou salve em PDF e assine.'}</span>
+  <span><button onclick="window.print()">Imprimir / salvar PDF</button>
+  <a href="/pedidos/${p.id}/modelos/${esc(gerado.codigo)}?formato=doc">Baixar Word</a>
+  <a href="/pedidos/${p.id}">Voltar</a></span>
+</div>`;
+  return `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(gerado.titulo)} — pedido #${p.id}</title>
+<style>${ESTILO_DOCUMENTO}</style></head>
+<body>${barra}
+${gerado.html}
+</body></html>`;
+}
+
 function erro(ctx, codigo, mensagem) {
   return layout(ctx, `Erro ${codigo}`, `<section class="cartao estreito"><h1>${codigo}</h1><p>${esc(mensagem)}</p><a href="/">Voltar ao início</a></section>`);
 }
 
-module.exports = { esc, inicio, servicos, cadastro, entrar, painel, equipe, novoPedido, pedido, erro };
+module.exports = {
+  esc, inicio, servicos, cadastro, entrar, painel, equipe, novoPedido, pedido, dadosDocumentos, documentoGerado, erro,
+};

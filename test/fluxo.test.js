@@ -63,7 +63,7 @@ test('fluxo completo: cadastro, pedido, upload, revisão e entrega', async () =>
 
   let html = await (await cliente.req(urlPedido)).text();
   assert.match(html, /Projeto de prevenção e combate a incêndio/);
-  assert.match(html, /0\/6 aprovados/);
+  assert.match(html, /0\/10 aprovados/);
 
   // Envia o primeiro item do checklist.
   const acaoUpload = html.match(/action="(\/pedidos\/\d+\/documentos\/(\d+)\/arquivo\?_csrf=[^"]+)"/);
@@ -96,7 +96,22 @@ test('fluxo completo: cadastro, pedido, upload, revisão e entrega', async () =>
   html = await (await cliente.req(urlPedido)).text();
   assert.match(html, /CBM-2026-000123/);
   assert.match(html, /Protocolado no órgão/);
-  assert.match(html, /1\/6 aprovados/);
+  assert.match(html, /1\/10 aprovados/);
+
+  // Dados preenchidos aparecem nos documentos gerados.
+  html = await (await cliente.req(`${urlPedido}/dados`)).text();
+  assert.match(html, /name="inc_ocupacao"/);
+  assert.doesNotMatch(html, /name="amb_condicionantes"/);
+  r = await cliente.post(`${urlPedido}/dados`, { inc_ocupacao: 'A-2 Habitação multifamiliar', proprietario: 'hack' },
+    `${urlPedido}/dados`);
+  assert.equal(r.status, 302);
+  html = await (await cliente.req(`${urlPedido}/modelos/memorial-incendio`)).text();
+  assert.match(html, /A-2 Habitação multifamiliar/);
+  assert.match(html, /Atlântico Ltda/);
+  r = await cliente.req(`${urlPedido}/modelos/procuracao?formato=doc`);
+  assert.match(r.headers.get('content-type'), /application\/msword/);
+  r = await cliente.req(`${urlPedido}/modelos/relatorio-condicionantes`);
+  assert.equal(r.status, 404);
 
   // O arquivo enviado pode ser baixado pelo dono.
   r = await cliente.req(`${urlPedido}/documentos/${docId}/arquivo`);
