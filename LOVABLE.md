@@ -1,0 +1,138 @@
+# Recriar o LicençaPB no Lovable
+
+O Lovable não roda este código (Node/Express + SQLite). O caminho é recriar o
+app lá, em React + Supabase (Lovable Cloud), colando os prompts abaixo **um de
+cada vez**, esperando cada etapa ficar pronta e testando antes de seguir.
+
+Os textos do catálogo e dos modelos de documentos já estão prontos neste
+repositório. Quando um prompt pedir, abra o arquivo no GitHub
+(github.com/gasteimasvaleu/licencapb), clique em **Raw**, copie tudo e cole no
+chat do Lovable junto com o prompt.
+
+---
+
+## Prompt 1 — Base, login e banco
+
+```
+Crie o app "LicençaPB": plataforma para construtores, arquitetos e engenheiros
+da Paraíba terceirizarem a emissão de licenças de obras (SUDEMA, Bombeiros,
+AESA, IPHAEP, DER-PB, CAGEPA, prefeituras, Receita Federal, IPHAN, SPU, DECEA,
+Energisa). O cliente abre um pedido e envia documentos; a nossa equipe confere,
+protocola no órgão e entrega a licença pelo painel. Tudo em português do Brasil.
+
+Use Lovable Cloud (Supabase) com autenticação por e-mail e senha.
+
+Papéis: "cliente" (padrão no cadastro) e "operador" (equipe). Guarde o papel
+numa tabela user_roles, nunca no perfil editável pelo usuário.
+
+Tabelas:
+- profiles: id (= auth.users), nome, telefone, profissao (Engenheiro(a),
+  Arquiteto(a), Construtora, Outro), registro_profissional (CREA/CAU).
+- pedidos: id, cliente_id, servico_codigo, status, titulo_obra, municipio,
+  endereco, proprietario, proprietario_doc (CPF/CNPJ), area_m2, observacoes,
+  protocolo_orgao, previsao (data), responsavel_id, dados (jsonb, padrão {}),
+  criado_em, atualizado_em.
+- documentos: id, pedido_id, item (texto), origem (checklist | extra | emitido),
+  modelo (texto, opcional), situacao (pendente | enviado | aprovado | rejeitado),
+  nota, arquivo_nome, arquivo_path, ia_situacao, ia_parecer (jsonb), atualizado_em.
+- eventos: id, pedido_id, autor_id, tipo (sistema | status | mensagem | documento),
+  texto, criado_em.
+
+Status do pedido: recebido, em_analise, pendencia, protocolado, exigencia,
+deferido, indeferido, cancelado (deferido, indeferido e cancelado são finais).
+
+Segurança (RLS): o cliente só vê e altera os próprios pedidos, documentos e
+eventos; o operador vê tudo. Arquivos num bucket privado "documentos", na pasta
+do pedido, com as mesmas regras.
+
+Páginas: início (apresentação + botão cadastrar), cadastro, entrar, e um
+painel do cliente vazio por enquanto.
+```
+
+## Prompt 2 — Catálogo de serviços
+
+Cole junto o conteúdo de `src/catalogo.js`.
+
+```
+Este é o catálogo de órgãos e serviços (arquivo abaixo). Converta para
+src/data/catalogo.ts mantendo todos os órgãos, serviços, descrições e listas
+de documentos exatamente como estão. Crie a página "Serviços" listando por
+âmbito (Estadual, Municipal, Federal, Concessionária) e órgão, com botão
+"Solicitar" em cada serviço.
+
+[cole aqui o conteúdo de src/catalogo.js]
+```
+
+## Prompt 3 — Pedidos (cliente)
+
+```
+Crie o fluxo de pedidos do cliente:
+- "Novo pedido": escolhe o serviço do catálogo e preenche obra, município,
+  endereço, proprietário e CPF/CNPJ (validar 11 ou 14 dígitos), área e
+  observações. Ao criar: insere um documento "checklist" para cada item do
+  serviço, um documento "emitido" com o nome do serviço, e um evento
+  "Pedido aberto".
+- Painel do cliente: lista dos pedidos com status, progresso
+  (documentos aprovados / total) e última atualização.
+- Página do pedido: dados, status, protocolo, previsão; checklist com upload
+  de arquivo por item (pdf, jpg, png, dwg, dxf, zip, kml, kmz; até 25 MB),
+  situação e nota de cada item; histórico de eventos; campo de mensagem para
+  a equipe; download do documento emitido quando existir.
+- O cliente não pode reenviar item já aprovado nem enviar o item "emitido".
+```
+
+## Prompt 4 — Painel da equipe
+
+```
+Crie a área do operador:
+- Fila de pedidos (padrão: ativos, mais antigos primeiro), com filtro por
+  status e "todos".
+- Na página do pedido o operador pode: mudar status, registrar protocolo e
+  previsão (cada mudança gera evento); aprovar ou rejeitar documentos (rejeição
+  exige nota explicando o motivo); solicitar documento extra; anexar o
+  documento emitido (o cliente vê e baixa).
+- O primeiro operador eu crio manualmente; me diga como marcar meu usuário
+  como operador.
+```
+
+## Prompt 5 — Modelos de documentos
+
+Cole junto o conteúdo de `src/campos.js` e `src/modelos.js` (se o Lovable
+reclamar do tamanho, mande `campos.js` primeiro e `modelos.js` na mensagem
+seguinte).
+
+```
+Implemente os modelos de documentos gerados automaticamente, a partir dos
+arquivos abaixo (campos e textos dos modelos). Para cada pedido:
+- Tela "Dados para os documentos" mostrando só os campos usados pelos modelos
+  daquele serviço, agrupados, salvos em pedidos.dados.
+- Cada modelo abre numa página pronta para imprimir/salvar em PDF; campos em
+  branco aparecem destacados em amarelo.
+Mantenha os textos dos modelos exatamente como estão.
+
+[cole aqui src/campos.js e src/modelos.js]
+```
+
+## Prompt 6 — IA com Claude (é aqui que entra a chave)
+
+```
+Adicione IA com a API da Anthropic (Claude), sempre numa Edge Function do
+Supabase, nunca no navegador. Use o secret ANTHROPIC_API_KEY e o modelo
+claude-opus-5-5.
+
+1. Edge function "validar-chave": chama GET https://api.anthropic.com/v1/models/claude-opus-5-5
+   com os headers x-api-key e anthropic-version: 2023-06-01. Responde
+   { ok: true } ou { ok: false, motivo } (401 = chave inválida, 403 = sem
+   permissão, 404 = modelo indisponível). Mostre o resultado numa página
+   "Configurações" visível só para operadores, com botão "Testar chave".
+2. Botão "Redigir com IA" na tela de dados: preenche só os campos de texto
+   vazios a partir dos dados do pedido, sem inventar números ou normas
+   (usar marcador [informar ...] quando faltar dado).
+3. Ao enviar PDF/JPG/PNG no checklist, conferir o arquivo e salvar em
+   ia_situacao (ok | atencao | incompativel) e ia_parecer (resumo e lista de
+   problemas). Mostrar o parecer no item. A aprovação continua com a equipe.
+```
+
+Quando o Lovable pedir a chave, ele abre um formulário para guardar o secret
+`ANTHROPIC_API_KEY`: cole a chave **lá**, nunca no chat. Depois use o botão
+"Testar chave" na página Configurações.
