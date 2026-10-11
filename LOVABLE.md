@@ -205,3 +205,67 @@ modais ou rolagem infinita: tudo em texto visível, com rótulos claros.
 Topo da página: contadores de cada lista e a data/hora da última atualização.
 Todas as ações registram no histórico quem fez (o usuário logado).
 ```
+
+## Prompt 8 — Pacote pronto para protocolo
+
+```
+Na Fila do Cowork, adicione a cada pedido um "Pacote para protocolo"
+(rota /equipe/pedidos/:id/pacote), usado tanto pelo agente de IA quanto por um
+operador humano. O objetivo é que quem for protocolar não precise procurar nada.
+Página simples, tudo visível, sem modais.
+
+1. Configuração por órgão (em orgaos_config, editável em Configurações → Órgãos)
+   - passo_a_passo: texto com os passos do protocolo naquele órgão, um por linha.
+   - exige: lista de marcações com o que precisa de uma pessoa:
+     login com código no celular, certificado digital, captcha,
+     aplicativo de celular, pagamento de taxa, entrega presencial.
+
+2. Cabeçalho do pacote
+   - Pedido, órgão, serviço, forma de protocolo e link do site de protocolo.
+   - Em destaque, as marcações de "exige" do órgão, com o aviso:
+     "Estas etapas precisam de uma pessoa".
+
+3. Dados para copiar
+   Lista de campos, cada um com rótulo, valor e um botão "Copiar" ao lado:
+   requerente (nome, CPF/CNPJ, endereço, e-mail, telefone, representante legal),
+   procurador (nome, CPF/CNPJ, endereço), responsável técnico (nome, título,
+   registro, ART/RRT), obra (nome, endereço, município, área, coordenadas,
+   pavimentos, unidades, uso) e os textos longos preenchidos em pedidos.dados
+   (descrição do empreendimento, memoriais, justificativas). Usar os mesmos
+   campos da tela "Dados para os documentos"; mostrar só os que têm valor e
+   marcar em vermelho "não preenchido" os que os modelos do serviço usam e
+   estão vazios.
+
+4. Arquivos
+   - Lista dos documentos aprovados na ordem do checklist, numerados:
+     "01 - <item>", "02 - <item>"..., com link de download de cada um.
+   - Botão "Baixar todos (ZIP)": edge function que monta um ZIP com os arquivos
+     aprovados renomeados como "01 - <item>.<extensão>", nessa ordem, e devolve
+     uma URL assinada válida por 1 hora.
+   - Links para abrir cada modelo gerado (procuração, requerimento etc.) para
+     imprimir/salvar em PDF.
+
+5. Passo a passo com progresso
+   Mostre o passo_a_passo do órgão como checklist. Ao marcar um passo, salve
+   quem marcou e quando (tabela pacote_passos: pedido_id, passo, feito_por,
+   feito_em). Assim o agente pode fazer parte, passar para uma pessoa, e ela
+   continua de onde parou.
+   No fim da lista, os passos fixos:
+   "Arquivos enviados ao órgão", "Taxa paga (se houver)",
+   "Protocolo registrado no LicençaPB".
+
+6. Passar a vez
+   - Botão "Preciso de uma pessoa": campo obrigatório "o que falta" (ex.:
+     "digitar código do gov.br", "assinar com certificado", "abrir no app da
+     prefeitura"). Marca aguardando_humano = true, registra evento com o
+     último passo concluído e o motivo.
+   - Na lista "Aguardando humano" da Fila do Cowork, cada pedido tem o link
+     "Abrir pacote", e o pacote mostra no topo, em amarelo, o motivo e em que
+     passo parou.
+   - Botão "Devolver para o Cowork" (só para operador humano): volta
+     aguardando_humano para false com um comentário.
+
+7. Registrar protocolo
+   Repita no fim do pacote os campos "nº de protocolo" e "previsão" com o mesmo
+   comportamento da Fila do Cowork (status protocolado + evento).
+```
