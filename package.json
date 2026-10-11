@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server.js",
+    "validar-chave": "node validar-chave.js",
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
   },
   "author": "",

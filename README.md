@@ -77,6 +77,12 @@ As chamadas usam saída estruturada (JSON validado) e *fallback* automático de
 modelo em caso de recusa. Sem a chave, o app funciona normalmente sem esses
 recursos (`IA_ATIVA=0` também desliga). Código em `src/ia.js`.
 
+**Validação da chave:** ao iniciar, o servidor confere a chave consultando o
+modelo configurado na API de modelos (não consome tokens). Chave inválida,
+sem permissão, com espaços/aspas ou modelo indisponível desligam a IA com uma
+mensagem no log; falhas passageiras (rede, 5xx) mantêm a IA ativa com um
+aviso. Para conferir a chave sem subir o servidor: `npm run validar-chave`.
+
 ## Funcionalidades
 
 - **Cliente:** cadastro com CREA/CAU, abertura de pedido, checklist de

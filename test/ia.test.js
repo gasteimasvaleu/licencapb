@@ -3,7 +3,8 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { criarIA, iaConfigurada, RecusaIA } = require('../src/ia');
+const Anthropic = require('@anthropic-ai/sdk');
+const { criarIA, iaConfigurada, problemaNoFormatoDaChave, RecusaIA } = require('../src/ia');
 const { criarApp } = require('../src/app');
 const { SERVICOS } = require('../src/catalogo');
 
@@ -20,6 +21,42 @@ test('iaConfigurada depende da chave e pode ser desligada', () => {
   assert.equal(iaConfigurada({}), false);
   assert.equal(iaConfigurada({ ANTHROPIC_API_KEY: 'x' }), true);
   assert.equal(iaConfigurada({ ANTHROPIC_API_KEY: 'x', IA_ATIVA: '0' }), false);
+});
+
+test('problemaNoFormatoDaChave aponta espaços e aspas na chave', () => {
+  assert.equal(problemaNoFormatoDaChave({ ANTHROPIC_API_KEY: 'sk-ant-abc' }), null);
+  assert.equal(problemaNoFormatoDaChave({}), null);
+  assert.match(problemaNoFormatoDaChave({ ANTHROPIC_API_KEY: 'sk-ant-abc\n' }), /espaços/);
+  assert.match(problemaNoFormatoDaChave({ ANTHROPIC_API_KEY: '"sk-ant-abc"' }), /aspas/);
+});
+
+test('validarChave consulta o modelo e classifica os erros da API', async () => {
+  const comErro = (erro) => criarIA({
+    cliente: { models: { retrieve: async () => { throw erro; } } },
+  }).validarChave();
+  const erroApi = (Classe, status) => new Classe(status, { type: 'error' }, 'falha', new Headers());
+
+  const consultados = [];
+  const ok = await criarIA({
+    cliente: { models: { retrieve: async (id) => { consultados.push(id); return { id }; } } },
+  }).validarChave();
+  assert.deepEqual(ok, { ok: true });
+  assert.deepEqual(consultados, ['claude-opus-5-5']);
+
+  let r = await comErro(erroApi(Anthropic.AuthenticationError, 401));
+  assert.equal(r.ok, false);
+  assert.equal(r.definitivo, true);
+  assert.match(r.motivo, /inválida/);
+  r = await comErro(erroApi(Anthropic.PermissionDeniedError, 403));
+  assert.equal(r.definitivo, true);
+  r = await comErro(erroApi(Anthropic.NotFoundError, 404));
+  assert.equal(r.definitivo, true);
+  assert.match(r.motivo, /IA_MODELO/);
+  r = await comErro(new Anthropic.APIConnectionError({ message: 'offline' }));
+  assert.equal(r.definitivo, false);
+  r = await comErro(erroApi(Anthropic.InternalServerError, 500));
+  assert.equal(r.definitivo, false);
+  await assert.rejects(comErro(new TypeError('bug')), TypeError);
 });
 
 test('redigirTextos pede um campo por texto, com modelo, fallback e saída estruturada', async () => {

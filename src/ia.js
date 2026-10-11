@@ -46,6 +46,15 @@ function descreverDados(valores, campos) {
     .join('\n');
 }
 
+// Erros comuns ao colar a chave: espaços, quebras de linha ou aspas junto do valor.
+function problemaNoFormatoDaChave(env = process.env) {
+  const chave = env.ANTHROPIC_API_KEY;
+  if (!chave) return null;
+  if (/\s/.test(chave)) return 'ANTHROPIC_API_KEY contém espaços ou quebras de linha.';
+  if (/^["']|["']$/.test(chave)) return 'ANTHROPIC_API_KEY está entre aspas; remova-as.';
+  return null;
+}
+
 class RecusaIA extends Error {}
 
 function criarIA({ cliente = new Anthropic(), modelo = MODELO } = {}) {
@@ -57,6 +66,34 @@ function criarIA({ cliente = new Anthropic(), modelo = MODELO } = {}) {
   }
 
   return {
+    // Confere a chave e o acesso ao modelo consultando a API de modelos (não
+    // gera tokens). definitivo = true quando não adianta tentar de novo sem
+    // corrigir a configuração; false para falhas passageiras (rede, 429, 5xx).
+    async validarChave() {
+      try {
+        // Timeout curto: a validação roda na inicialização do servidor.
+        await cliente.models.retrieve(modelo, {}, { timeout: 15_000, maxRetries: 1 });
+        return { ok: true };
+      } catch (erro) {
+        if (erro instanceof Anthropic.AuthenticationError) {
+          return { ok: false, definitivo: true, motivo: 'Chave da API inválida ou revogada.' };
+        }
+        if (erro instanceof Anthropic.PermissionDeniedError) {
+          return { ok: false, definitivo: true, motivo: 'A chave não tem permissão para usar a API.' };
+        }
+        if (erro instanceof Anthropic.NotFoundError) {
+          return { ok: false, definitivo: true, motivo: `Modelo "${modelo}" não disponível para esta chave (confira IA_MODELO).` };
+        }
+        if (erro instanceof Anthropic.APIConnectionError) {
+          return { ok: false, definitivo: false, motivo: `Sem conexão com a API: ${erro.message}` };
+        }
+        if (erro instanceof Anthropic.APIError) {
+          return { ok: false, definitivo: false, motivo: `API respondeu ${erro.status}: ${erro.message}` };
+        }
+        throw erro;
+      }
+    },
+
     // Redige os campos de texto longo vazios usando os demais dados do pedido.
     // camposAlvo: [{id, rotulo}], camposContexto: [{id, rotulo}] (inclui os do pedido).
     async redigirTextos({ servico, valores, camposAlvo, camposContexto }) {
@@ -104,4 +141,4 @@ ${descreverDados(valores, camposContexto)}`;
   };
 }
 
-module.exports = { criarIA, iaConfigurada, RecusaIA };
+module.exports = { criarIA, iaConfigurada, problemaNoFormatoDaChave, RecusaIA };
