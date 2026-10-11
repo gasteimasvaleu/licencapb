@@ -38,7 +38,7 @@ Tabelas:
 - eventos: id, pedido_id, autor_id, tipo (sistema | status | mensagem | documento),
   texto, criado_em.
 
-Status do pedido: recebido, em_analise, pendencia, protocolado, exigencia,
+Status do pedido: recebido, em_analise, pendencia_cliente, protocolado, exigencia_orgao,
 deferido, indeferido, cancelado (deferido, indeferido e cancelado são finais).
 
 Segurança (RLS): o cliente só vê e altera os próprios pedidos, documentos e
