@@ -44,6 +44,9 @@ REGRAS QUE NUNCA PODEM SER QUEBRADAS
    dos órgãos sem uma pessoa autorizar.
 7. Um pedido por vez. Termine (protocolado, devolvido ou passado para uma
    pessoa) antes de abrir o próximo.
+8. Na triagem de documentos, só use "Aprovar" direto quando o botão aparecer
+   E você não tiver nenhuma dúvida. Documentos técnicos (ART/RRT, projetos,
+   estudos, memoriais) você só sugere: nunca aprova.
 
 COMO REGISTRAR
 - Marque cada passo do passo a passo no pacote assim que concluir.
@@ -96,6 +99,52 @@ site de consulta do órgão e verifique o andamento pelo nº de protocolo.
 - Se a consulta pedir login, código ou captcha: anote no resumo e siga para o
   próximo.
 No fim, mande o resumo com o que mudou.
+```
+
+### Triar documentos
+
+```
+Abra a Fila do Cowork, seção "Triagem de documentos", do mais antigo para o
+mais novo. Para cada documento: abra o arquivo, leia o parecer da IA e confira
+com os dados do pedido mostrados no cartão. Depois escolha:
+- "Sugerir aprovação" se tudo abaixo estiver certo;
+- "Sugerir rejeição" com uma nota clara para o cliente (o que está errado e o
+  que enviar no lugar);
+- "Aprovar" direto só se o botão aparecer e não houver nenhuma dúvida;
+- "Preciso de uma pessoa" se não der para decidir.
+
+Em todos os documentos:
+- Corresponde ao item do checklist? Está legível, completo (todas as páginas,
+  frente e verso)?
+- Nomes, CPF/CNPJ e endereços batem com o pedido?
+- Tem data de validade ou de emissão? Está vencido?
+- Se precisa de assinatura, está assinado por todos que devem assinar?
+
+Por tipo:
+- RG/CNH: nome e CPF iguais aos do requerente ou do representante; CNH dentro
+  da validade.
+- Contrato social / cartão CNPJ: razão social e CNPJ iguais aos do pedido;
+  situação "ativa" no cartão; o representante legal é quem assina os
+  documentos.
+- Matrícula / escritura / contrato do imóvel: o proprietário é o requerente
+  (se não for, precisa de procuração ou contrato que dê o direito); endereço
+  e área compatíveis com a obra; anotar a data de emissão da certidão.
+- ART/RRT: profissional e registro iguais ao responsável técnico do pedido;
+  atividade compatível (projeto ou execução, conforme o item); endereço da
+  obra correto; comprovante de pagamento, se vier junto. Sempre só sugerir.
+- Plantas e projetos: legíveis, com carimbo (proprietário, endereço, RT,
+  registro) e assinaturas. Não avalie o mérito técnico. Sempre só sugerir.
+- Estudos ambientais, memoriais, laudos: confira só se é o estudo pedido,
+  se está completo e assinado pelo RT. Sempre só sugerir.
+- Certidão de uso do solo: município e endereço corretos; data de emissão.
+- Fotos: são do local da obra (compare com o endereço) e parecem atuais.
+- Comprovante de pagamento: órgão, valor e beneficiário corretos; consta como
+  pago.
+- Modelos gerados assinados (procuração, requerimento, declaração): assinados
+  por quem deve assinar, sem rasuras, com os mesmos dados do pedido.
+
+Pare depois de [20] documentos e mande o resumo: quantos sugeriu aprovar,
+rejeitar, quantos aprovou direto e quantos passou para uma pessoa.
 ```
 
 ### Retomar um pedido devolvido por uma pessoa

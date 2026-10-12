@@ -269,3 +269,60 @@ Página simples, tudo visível, sem modais.
    Repita no fim do pacote os campos "nº de protocolo" e "previsão" com o mesmo
    comportamento da Fila do Cowork (status protocolado + evento).
 ```
+
+## Prompt 9 — Triagem de documentos pelo Cowork
+
+```
+Adicione a triagem de documentos feita pelo agente de IA (Claude Cowork), com
+confirmação humana. Página simples, tudo visível, sem modais.
+
+1. Banco
+   - Em documentos, novas colunas: sugestao (aprovar | rejeitar, nula),
+     sugestao_nota (texto), sugestao_por (usuário), sugestao_em (data/hora).
+   - Tabela config_triagem (uma linha): cowork_aprova_simples (boolean,
+     padrão false).
+   - Tabela itens_simples: texto (palavra-chave). Um documento é "simples"
+     quando o nome do item contém alguma dessas palavras (sem diferenciar
+     maiúsculas). Valores iniciais: "identificação", "RG", "CNH",
+     "cartão CNPJ", "contrato social", "comprovante de pagamento".
+   - Em Configurações (só operadores): seção "Triagem" com a chave
+     "Cowork pode aprovar documentos simples sozinho" e a lista editável de
+     palavras de itens simples.
+
+2. Lista "Triagem de documentos" na Fila do Cowork (nova seção, no topo)
+   Documentos com situacao = enviado e sugestao nula, do envio mais antigo
+   para o mais novo. Para cada documento, um cartão com:
+   - Pedido, órgão, serviço, item do checklist e se é "simples" ou "técnico".
+   - Link para abrir/baixar o arquivo e o nome original.
+   - Parecer da IA (ia_situacao e ia_parecer), em destaque se não for "ok".
+   - Dados do pedido para comparar: requerente (nome, CPF/CNPJ, endereço),
+     representante legal, imóvel (endereço, matrícula), responsável técnico
+     (nome, registro, ART/RRT), obra (endereço, município, área).
+   - Ações:
+     a) "Sugerir aprovação": nota opcional.
+     b) "Sugerir rejeição": nota obrigatória, escrita para o cliente entender
+        o que corrigir.
+     c) "Aprovar" (direto): só aparece quando cowork_aprova_simples = true, o
+        documento é simples E ia_situacao = ok. Aprova o documento e registra
+        evento "Aprovado pelo Cowork".
+     d) "Preciso de uma pessoa": motivo obrigatório; grava como sugestão nula
+        com a nota e mostra o documento na lista de confirmação com destaque.
+   As sugestões não aparecem para o cliente.
+
+3. Lista "Sugestões para confirmar" (Fila do Cowork e painel da equipe)
+   Documentos com sugestao preenchida e situacao = enviado. Mostrar o arquivo,
+   o parecer da IA, a sugestão e a nota. Botões para operador humano:
+   - "Confirmar": aplica a sugestão (aprovar, ou rejeitar usando a nota como
+     motivo para o cliente) e registra evento com quem confirmou.
+   - "Mudar": permite escolher o contrário e editar a nota antes de aplicar.
+   Na página do pedido, mostrar a sugestão do Cowork ao lado de cada item.
+
+4. Medir acerto
+   Ao confirmar ou mudar, guarde se a sugestão foi mantida (coluna
+   sugestao_mantida boolean). Em Configurações → Triagem, mostre a taxa de
+   sugestões mantidas nos últimos 30 dias, separada por simples e técnicos,
+   para decidir quando ligar a aprovação direta.
+
+5. Ao rejeitar (por confirmação humana), o documento volta para o cliente
+   reenviar e as colunas de sugestão são limpas quando ele reenviar.
+```
