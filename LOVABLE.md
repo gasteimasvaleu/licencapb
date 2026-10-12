@@ -326,3 +326,52 @@ confirmação humana. Página simples, tudo visível, sem modais.
 5. Ao rejeitar (por confirmação humana), o documento volta para o cliente
    reenviar e as colunas de sugestão são limpas quando ele reenviar.
 ```
+
+## Prompt 10 — Ajuste: o Cowork não protocola, só confere
+
+Use este prompt se você já colou os prompts 7 e 8. Se ainda não colou, cole
+os dois e logo depois este.
+
+```
+Mudança de processo: o agente de IA (Cowork) não vai mais protocolar nos
+órgãos. Ele faz a triagem dos documentos e a conferência final do pacote; o
+protocolo é feito por uma pessoa da equipe (site, aplicativo ou presencial).
+Ajuste a Fila do Cowork e o Pacote para protocolo assim:
+
+1. Banco
+   - Em pedidos, novas colunas: pacote_conferido (boolean, padrão false),
+     pacote_nota (texto), pacote_conferido_por, pacote_conferido_em.
+   - Quando qualquer documento do pedido mudar de situação depois da
+     conferência, voltar pacote_conferido para false.
+
+2. Fila do Cowork (para o agente) fica com duas seções:
+   - "Triagem de documentos" (já existe).
+   - "Conferir pacote": pedidos com todos os documentos aprovados e
+     pacote_conferido = false, do mais antigo para o mais novo, com link para
+     o pacote. Ações no pacote:
+     a) "Pacote pronto": nota obrigatória para quem vai protocolar (pode ser
+        "sem observações"). Marca pacote_conferido = true e registra evento.
+     b) "Devolver ao cliente": nota obrigatória; status pendencia_cliente e
+        mensagem para o cliente.
+     c) "Preciso de uma pessoa": motivo obrigatório; aguardando_humano = true.
+   - Remover da Fila do Cowork as seções "Prontos para protocolar" e
+     "Acompanhar no órgão" e o botão "Registrar protocolo" para o agente.
+
+3. Nova página "Protocolos" no painel da equipe (só operadores humanos)
+   - "Prontos para protocolar": pedidos com pacote_conferido = true e status
+     ainda não protocolado. Cada linha mostra órgão, serviço, forma de
+     protocolo (online / aplicativo / presencial / e-mail), a nota do Cowork
+     em destaque e o link do pacote.
+   - Filtro por forma de protocolo, para juntar os presenciais do mesmo órgão
+     numa ida só.
+   - No pacote, para operador humano: botão "Registrar protocolo" (nº,
+     previsão e upload opcional do comprovante), que muda o status para
+     protocolado.
+   - "Acompanhar no órgão": a mesma lista que existia na Fila do Cowork
+     (protocolado / exigencia_orgao), agora aqui, com as mesmas ações
+     ("Sem novidade", "Exigência do órgão", "Licença emitida").
+
+4. Em orgaos_config, acrescentar "aplicativo" às opções de forma_protocolo.
+   O passo_a_passo e as marcações de "exige" continuam, como roteiro para
+   a equipe.
+```
