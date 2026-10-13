@@ -206,92 +206,36 @@ Topo da página: contadores de cada lista e a data/hora da última atualização
 Todas as ações registram no histórico quem fez (o usuário logado).
 ```
 
-## Prompt 8 — Pacote pronto para protocolo
+## Prompt 8 — Triagem de documentos pelo Cowork
 
 ```
-Na Fila do Cowork, adicione a cada pedido um "Pacote para protocolo"
-(rota /equipe/pedidos/:id/pacote), usado tanto pelo agente de IA quanto por um
-operador humano. O objetivo é que quem for protocolar não precise procurar nada.
-Página simples, tudo visível, sem modais.
+Divisão de trabalho na plataforma:
+- IA do app (edge function do Prompt 6): dá um parecer automático em cada
+  arquivo enviado pelo cliente.
+- Agente de IA "Cowork" (usa a conta de operador "Cowork"): faz a triagem dos
+  documentos e a conferência final do pacote. Ele NÃO protocola.
+- Equipe humana: confirma a triagem, protocola nos órgãos (site, aplicativo,
+  presencial ou e-mail) e acompanha os processos.
 
-1. Configuração por órgão (em orgaos_config, editável em Configurações → Órgãos)
-   - passo_a_passo: texto com os passos do protocolo naquele órgão, um por linha.
-   - exige: lista de marcações com o que precisa de uma pessoa:
-     login com código no celular, certificado digital, captcha,
-     aplicativo de celular, pagamento de taxa, entrega presencial.
-
-2. Cabeçalho do pacote
-   - Pedido, órgão, serviço, forma de protocolo e link do site de protocolo.
-   - Em destaque, as marcações de "exige" do órgão, com o aviso:
-     "Estas etapas precisam de uma pessoa".
-
-3. Dados para copiar
-   Lista de campos, cada um com rótulo, valor e um botão "Copiar" ao lado:
-   requerente (nome, CPF/CNPJ, endereço, e-mail, telefone, representante legal),
-   procurador (nome, CPF/CNPJ, endereço), responsável técnico (nome, título,
-   registro, ART/RRT), obra (nome, endereço, município, área, coordenadas,
-   pavimentos, unidades, uso) e os textos longos preenchidos em pedidos.dados
-   (descrição do empreendimento, memoriais, justificativas). Usar os mesmos
-   campos da tela "Dados para os documentos"; mostrar só os que têm valor e
-   marcar em vermelho "não preenchido" os que os modelos do serviço usam e
-   estão vazios.
-
-4. Arquivos
-   - Lista dos documentos aprovados na ordem do checklist, numerados:
-     "01 - <item>", "02 - <item>"..., com link de download de cada um.
-   - Botão "Baixar todos (ZIP)": edge function que monta um ZIP com os arquivos
-     aprovados renomeados como "01 - <item>.<extensão>", nessa ordem, e devolve
-     uma URL assinada válida por 1 hora.
-   - Links para abrir cada modelo gerado (procuração, requerimento etc.) para
-     imprimir/salvar em PDF.
-
-5. Passo a passo com progresso
-   Mostre o passo_a_passo do órgão como checklist. Ao marcar um passo, salve
-   quem marcou e quando (tabela pacote_passos: pedido_id, passo, feito_por,
-   feito_em). Assim o agente pode fazer parte, passar para uma pessoa, e ela
-   continua de onde parou.
-   No fim da lista, os passos fixos:
-   "Arquivos enviados ao órgão", "Taxa paga (se houver)",
-   "Protocolo registrado no LicençaPB".
-
-6. Passar a vez
-   - Botão "Preciso de uma pessoa": campo obrigatório "o que falta" (ex.:
-     "digitar código do gov.br", "assinar com certificado", "abrir no app da
-     prefeitura"). Marca aguardando_humano = true, registra evento com o
-     último passo concluído e o motivo.
-   - Na lista "Aguardando humano" da Fila do Cowork, cada pedido tem o link
-     "Abrir pacote", e o pacote mostra no topo, em amarelo, o motivo e em que
-     passo parou.
-   - Botão "Devolver para o Cowork" (só para operador humano): volta
-     aguardando_humano para false com um comentário.
-
-7. Registrar protocolo
-   Repita no fim do pacote os campos "nº de protocolo" e "previsão" com o mesmo
-   comportamento da Fila do Cowork (status protocolado + evento).
-```
-
-## Prompt 9 — Triagem de documentos pelo Cowork
-
-```
-Adicione a triagem de documentos feita pelo agente de IA (Claude Cowork), com
-confirmação humana. Página simples, tudo visível, sem modais.
+Crie a triagem de documentos pelo Cowork, com confirmação humana. Páginas
+simples, tudo visível, sem modais.
 
 1. Banco
-   - Em documentos, novas colunas: sugestao (aprovar | rejeitar, nula),
-     sugestao_nota (texto), sugestao_por (usuário), sugestao_em (data/hora).
+   - Em documentos: sugestao (aprovar | rejeitar, nula), sugestao_nota,
+     sugestao_por, sugestao_em, sugestao_mantida (boolean, nula).
    - Tabela config_triagem (uma linha): cowork_aprova_simples (boolean,
      padrão false).
    - Tabela itens_simples: texto (palavra-chave). Um documento é "simples"
      quando o nome do item contém alguma dessas palavras (sem diferenciar
      maiúsculas). Valores iniciais: "identificação", "RG", "CNH",
      "cartão CNPJ", "contrato social", "comprovante de pagamento".
-   - Em Configurações (só operadores): seção "Triagem" com a chave
+   - Em Configurações (só operadores humanos): seção "Triagem" com a chave
      "Cowork pode aprovar documentos simples sozinho" e a lista editável de
      palavras de itens simples.
 
-2. Lista "Triagem de documentos" na Fila do Cowork (nova seção, no topo)
+2. Na Fila do Cowork, nova seção no topo: "Triagem de documentos"
    Documentos com situacao = enviado e sugestao nula, do envio mais antigo
-   para o mais novo. Para cada documento, um cartão com:
+   para o mais novo. Cada cartão mostra:
    - Pedido, órgão, serviço, item do checklist e se é "simples" ou "técnico".
    - Link para abrir/baixar o arquivo e o nome original.
    - Parecer da IA (ia_situacao e ia_parecer), em destaque se não for "ok".
@@ -303,75 +247,128 @@ confirmação humana. Página simples, tudo visível, sem modais.
      b) "Sugerir rejeição": nota obrigatória, escrita para o cliente entender
         o que corrigir.
      c) "Aprovar" (direto): só aparece quando cowork_aprova_simples = true, o
-        documento é simples E ia_situacao = ok. Aprova o documento e registra
-        evento "Aprovado pelo Cowork".
-     d) "Preciso de uma pessoa": motivo obrigatório; grava como sugestão nula
-        com a nota e mostra o documento na lista de confirmação com destaque.
-   As sugestões não aparecem para o cliente.
+        documento é simples E ia_situacao = ok. Aprova e registra evento
+        "Aprovado pelo Cowork".
+     d) "Preciso de uma pessoa": motivo obrigatório; o documento vai para a
+        lista de confirmação com destaque.
+   O cliente não vê as sugestões.
 
-3. Lista "Sugestões para confirmar" (Fila do Cowork e painel da equipe)
-   Documentos com sugestao preenchida e situacao = enviado. Mostrar o arquivo,
-   o parecer da IA, a sugestão e a nota. Botões para operador humano:
+3. Lista "Sugestões para confirmar" (no painel da equipe e na página do pedido)
+   Documentos com sugestão ou pedido de ajuda e situacao = enviado. Mostra o
+   arquivo, o parecer da IA, a sugestão e a nota. Para operador humano:
    - "Confirmar": aplica a sugestão (aprovar, ou rejeitar usando a nota como
-     motivo para o cliente) e registra evento com quem confirmou.
-   - "Mudar": permite escolher o contrário e editar a nota antes de aplicar.
-   Na página do pedido, mostrar a sugestão do Cowork ao lado de cada item.
+     motivo para o cliente), grava sugestao_mantida = true e registra evento.
+   - "Mudar": escolhe o contrário, permite editar a nota, aplica e grava
+     sugestao_mantida = false.
 
-4. Medir acerto
-   Ao confirmar ou mudar, guarde se a sugestão foi mantida (coluna
-   sugestao_mantida boolean). Em Configurações → Triagem, mostre a taxa de
-   sugestões mantidas nos últimos 30 dias, separada por simples e técnicos,
-   para decidir quando ligar a aprovação direta.
+4. Em Configurações → Triagem, mostrar a taxa de sugestões mantidas nos
+   últimos 30 dias, separada por simples e técnicos.
 
-5. Ao rejeitar (por confirmação humana), o documento volta para o cliente
-   reenviar e as colunas de sugestão são limpas quando ele reenviar.
+5. Quando o cliente reenviar um arquivo, limpar as colunas de sugestão daquele
+   documento.
 ```
 
-## Prompt 10 — Ajuste: o Cowork não protocola, só confere
-
-Use este prompt se você já colou os prompts 7 e 8. Se ainda não colou, cole
-os dois e logo depois este.
+## Prompt 9 — Pacote para protocolo e conferência pelo Cowork
 
 ```
-Mudança de processo: o agente de IA (Cowork) não vai mais protocolar nos
-órgãos. Ele faz a triagem dos documentos e a conferência final do pacote; o
-protocolo é feito por uma pessoa da equipe (site, aplicativo ou presencial).
-Ajuste a Fila do Cowork e o Pacote para protocolo assim:
+Crie para cada pedido um "Pacote para protocolo" (rota
+/equipe/pedidos/:id/pacote), visível só para operadores. Ele é usado pelo
+Cowork para a conferência final e pela equipe humana para protocolar. Página
+simples, tudo visível, sem modais.
 
-1. Banco
-   - Em pedidos, novas colunas: pacote_conferido (boolean, padrão false),
-     pacote_nota (texto), pacote_conferido_por, pacote_conferido_em.
-   - Quando qualquer documento do pedido mudar de situação depois da
-     conferência, voltar pacote_conferido para false.
+1. Configuração por órgão (orgaos_config, em Configurações → Órgãos)
+   - forma_protocolo: acrescentar a opção "aplicativo" (fica online |
+     aplicativo | presencial | email).
+   - passo_a_passo: texto, um passo por linha (roteiro para a equipe).
+   - exige: marcações do que o protocolo exige: login gov.br, certificado
+     digital, captcha, aplicativo de celular, pagamento de taxa, via original,
+     entrega presencial.
+   - Manter site_protocolo, site_consulta e instrucoes.
 
-2. Fila do Cowork (para o agente) fica com duas seções:
-   - "Triagem de documentos" (já existe).
-   - "Conferir pacote": pedidos com todos os documentos aprovados e
-     pacote_conferido = false, do mais antigo para o mais novo, com link para
-     o pacote. Ações no pacote:
+2. Cabeçalho
+   Pedido, cliente, órgão, serviço, forma de protocolo, link do site de
+   protocolo (se houver), as marcações de "exige" e as instruções do órgão.
+
+3. Dados para copiar
+   Cada campo com rótulo, valor e botão "Copiar": requerente (nome, CPF/CNPJ,
+   endereço, e-mail, telefone, representante legal), procurador, responsável
+   técnico (nome, título, registro, ART/RRT), obra (nome, endereço, município,
+   área, coordenadas, pavimentos, unidades, uso) e os textos longos de
+   pedidos.dados. Mostrar só os que têm valor e marcar em vermelho
+   "não preenchido" os que os modelos do serviço usam e estão vazios.
+
+4. Arquivos
+   - Documentos aprovados na ordem do checklist, numerados "01 - <item>",
+     com link de download.
+   - Botão "Baixar todos (ZIP)": edge function que monta o ZIP com os arquivos
+     aprovados renomeados "01 - <item>.<extensão>" e devolve URL assinada
+     válida por 1 hora.
+   - Links para os modelos gerados (procuração, requerimento etc.).
+
+5. Roteiro do órgão
+   O passo_a_passo do órgão como lista, só para leitura.
+
+6. Conferência final (feita pelo Cowork)
+   - Em pedidos: pacote_conferido (boolean, padrão false), pacote_nota,
+     pacote_conferido_por, pacote_conferido_em.
+   - Botões no pacote enquanto pacote_conferido = false:
      a) "Pacote pronto": nota obrigatória para quem vai protocolar (pode ser
         "sem observações"). Marca pacote_conferido = true e registra evento.
      b) "Devolver ao cliente": nota obrigatória; status pendencia_cliente e
+        mensagem no histórico, visível ao cliente.
+     c) "Preciso de uma pessoa": motivo obrigatório; aguardando_humano = true
+        e evento.
+   - Quando pacote_conferido = true, mostrar a nota do Cowork em destaque no
+     topo do pacote.
+   - Se algum documento do pedido mudar de situação ou for reenviado depois da
+     conferência, voltar pacote_conferido para false.
+```
+
+## Prompt 10 — Página Protocolos (equipe) e ajuste da Fila do Cowork
+
+```
+Reorganize as filas de acordo com a divisão de trabalho: o Cowork só faz
+triagem e conferência; a equipe humana protocola e acompanha.
+
+1. Fila do Cowork (/equipe/cowork) fica só com estas seções, nesta ordem:
+   a) "Triagem de documentos" (já existe).
+   b) "Conferir pacote": pedidos com todos os documentos de origem checklist
+      e extra aprovados, pelo menos um documento, pacote_conferido = false,
+      aguardando_humano = false e status recebido, em_analise ou
+      pendencia_cliente. Do mais antigo para o mais novo, com link para o
+      pacote.
+   c) "Aguardando humano": pedidos com aguardando_humano = true, com o motivo
+      mais recente e o botão "Resolvido" (só operador humano), que volta a
+      flag para false com um comentário.
+   Remova da Fila do Cowork as seções "Prontos para protocolar" e
+   "Acompanhar no órgão" e os botões "Registrar protocolo", "Sem novidade",
+   "Exigência do órgão" e "Licença emitida". O usuário Cowork não deve ver
+   esses botões em nenhuma página.
+
+2. Nova página "Protocolos" (/equipe/protocolos), só para operadores humanos,
+   com link no menu da equipe.
+   a) "Prontos para protocolar": pedidos com pacote_conferido = true e status
+      diferente de protocolado, exigencia_orgao, deferido, indeferido e
+      cancelado. Cada linha mostra pedido, cliente, órgão, serviço, forma de
+      protocolo, marcações de "exige", a nota do Cowork em destaque e o link
+      do pacote. Filtros por órgão e por forma de protocolo (para juntar os
+      presenciais do mesmo órgão numa ida só).
+      Botão "Registrar protocolo": nº de protocolo, previsão (data) e upload
+      opcional do comprovante (salvo como documento de origem extra, já
+      aprovado). Muda o status para protocolado e registra evento.
+   b) "Acompanhar no órgão": pedidos com status protocolado ou
+      exigencia_orgao, do protocolo mais antigo para o mais novo, com nº de
+      protocolo, previsão, link do site de consulta e data da última
+      atualização. Ações:
+      - "Sem novidade": registra evento "Consulta no órgão sem alterações".
+      - "Exigência do órgão": texto obrigatório; status exigencia_orgao e
         mensagem para o cliente.
-     c) "Preciso de uma pessoa": motivo obrigatório; aguardando_humano = true.
-   - Remover da Fila do Cowork as seções "Prontos para protocolar" e
-     "Acompanhar no órgão" e o botão "Registrar protocolo" para o agente.
+      - "Licença emitida": upload no documento de origem emitido e status
+        deferido.
+      - "Indeferido": texto obrigatório; status indeferido e mensagem para o
+        cliente.
+   Topo da página: contadores de cada lista.
 
-3. Nova página "Protocolos" no painel da equipe (só operadores humanos)
-   - "Prontos para protocolar": pedidos com pacote_conferido = true e status
-     ainda não protocolado. Cada linha mostra órgão, serviço, forma de
-     protocolo (online / aplicativo / presencial / e-mail), a nota do Cowork
-     em destaque e o link do pacote.
-   - Filtro por forma de protocolo, para juntar os presenciais do mesmo órgão
-     numa ida só.
-   - No pacote, para operador humano: botão "Registrar protocolo" (nº,
-     previsão e upload opcional do comprovante), que muda o status para
-     protocolado.
-   - "Acompanhar no órgão": a mesma lista que existia na Fila do Cowork
-     (protocolado / exigencia_orgao), agora aqui, com as mesmas ações
-     ("Sem novidade", "Exigência do órgão", "Licença emitida").
-
-4. Em orgaos_config, acrescentar "aplicativo" às opções de forma_protocolo.
-   O passo_a_passo e as marcações de "exige" continuam, como roteiro para
-   a equipe.
+3. Contadores no painel da equipe: documentos para confirmar (triagem),
+   pacotes para conferir, prontos para protocolar, aguardando humano.
 ```
