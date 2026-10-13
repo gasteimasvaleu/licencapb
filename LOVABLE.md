@@ -372,3 +372,37 @@ triagem e conferência; a equipe humana protocola e acompanha.
 3. Contadores no painel da equipe: documentos para confirmar (triagem),
    pacotes para conferir, prontos para protocolar, aguardando humano.
 ```
+
+## Prompt 11 — Separar o usuário Cowork dos operadores humanos
+
+```
+Hoje o agente de IA "Cowork" entra como operador, então ele consegue fazer
+tudo que um operador humano faz. Separe os dois:
+
+1. Em user_roles, crie o papel "agente" (além de cliente e operador). A conta
+   do Cowork deve ter só o papel "agente". Na página Usuários, permita
+   escolher o papel "agente".
+
+2. O agente pode:
+   - ver a Fila do Cowork e as páginas de pedido e de pacote;
+   - baixar arquivos dos pedidos;
+   - usar só estes botões: "Sugerir aprovação", "Sugerir rejeição",
+     "Aprovar" (direto, só nas condições já definidas), "Preciso de uma
+     pessoa", "Pacote pronto" e "Devolver ao cliente".
+
+3. O agente NÃO pode (esconder no menu, bloquear a rota e bloquear no banco
+   com RLS):
+   - Área do operador, Protocolos, Configurações e Usuários;
+   - "Confirmar"/"Mudar" sugestões, "Resolvido", "Registrar protocolo",
+     "Sem novidade", "Exigência do órgão", "Licença emitida", "Indeferido",
+     mudar status manualmente, aprovar/rejeitar documento diretamente fora da
+     triagem, solicitar documento extra;
+   - alterar config_triagem, itens_simples e orgaos_config (só leitura).
+
+4. Na Fila do Cowork, a seção "Sugestões para confirmar" aparece só para
+   operadores humanos; para o agente, ela não aparece.
+
+5. Onde o texto diz "só operadores", considerar operador = papel "operador"
+   (humano), nunca "agente". Registrar nos eventos o nome do usuário, para
+   ficar claro o que foi feito pelo Cowork.
+```
